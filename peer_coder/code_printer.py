@@ -1,10 +1,18 @@
-from typing import List, Iterator
-from rich.syntax import Syntax
-from rich.console import Console, RenderResult
-import os
-import glob
-import random
 import ast
+import glob
+import os
+import random
+from time import sleep
+from typing import Iterator, List
+
+from rich.console import Console, RenderResult
+from rich.segment import Segment
+from rich.syntax import Syntax
+from rich.text import Text
+
+WORDS_PER_MINUTE = 80
+CHARS_PER_WORD = 5
+CHAR_RATE = 60 / (CHARS_PER_WORD * WORDS_PER_MINUTE)
 
 
 def get_python_files_from_repo(dir_path: str) -> Iterator[str]:
@@ -21,7 +29,7 @@ def get_python_files_from_repo(dir_path: str) -> Iterator[str]:
     List[str]
         An iterator of file paths to python files
     """
-    return glob.iglob(net_x_path + r"/**/*.py", recursive=True)
+    return glob.iglob(test_path + r"/**/*.py", recursive=True)
 
 
 def pick_defs_from_string(code: str) -> List[ast.FunctionDef]:
@@ -54,29 +62,58 @@ def random_def_syntax_from_file(file_name: str):
 
 
 def pretty_print_syntax(syntax: Syntax) -> None:
-    class _SimpleSyntax:
+    console = Console()
+
+    class _RevealingSyntax:
         def __init__(self, result: RenderResult):
-            self.result = result
+            self.result = [i for i in result]
+
+            self.progress = 0
+            self.length = sum(len(i.text) for i in self.result if not i.text.isspace())
 
         def __rich_console__(self, a, b):
-            return self.result
+            self.progress += 1
+            current_partial_segment = None
 
-    console = Console()
-    # for line in syntax.__rich_console__(console, console.options):
-    #     # print(line)
-    #     console.print(_SimpleSyntax(line))
+            current_char_index = 0
+            i: Segment
+            for index, i in enumerate(self.result):
+                if i.text.isspace():
+                    continue
 
-    console.print(syntax, end="")
+                if current_char_index + len(i.text) < self.progress:
+                    current_char_index += len(i.text)
+
+                elif current_char_index + len(i.text) == self.progress:
+                    yield from self.result[: index + 1]
+                    return
+
+                else:
+                    partial_length = self.progress - current_char_index
+                    current_partial_segment = Segment(
+                        i.text[:partial_length], i.style, i.is_control
+                    )
+                    yield from self.result[:index] + [current_partial_segment]
+                    return
+            return
+
+        def __len__(self):
+            return self.length
+
+    code = _RevealingSyntax(syntax.__rich_console__(console, console.options))
+
+    for _ in range(len(code)):
+        console.clear()
+        console.print(code)
+        sleep(CHAR_RATE)
 
 
 if __name__ == "__main__":
-    net_x_path = os.path.join(
-        "..", "networkx", "networkx", "algorithms", "tree", "mst.py"
-    )
-    net_x_path = os.path.abspath(net_x_path)
+    test_path = os.path.join(".", "peer_coder", "test.py")
+    test_path = os.path.abspath(test_path)
     # print(net_x_path)
 
     # path_gen = get_python_files_from_repo(net_x_path)
     # path = next(path_gen)
-    my_syntax = random_def_syntax_from_file(net_x_path)
+    my_syntax = random_def_syntax_from_file(test_path)
     pretty_print_syntax(my_syntax)
