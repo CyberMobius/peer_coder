@@ -8,7 +8,6 @@ from typing import Iterator, List
 from rich.console import Console, RenderResult
 from rich.segment import Segment
 from rich.syntax import Syntax
-from rich.text import Text
 
 WORDS_PER_MINUTE = 80
 CHARS_PER_WORD = 5
