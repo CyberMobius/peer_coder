@@ -2,6 +2,7 @@ import ast
 import glob
 import os
 import random
+import string
 from time import sleep
 from typing import Iterator, List
 
@@ -75,6 +76,10 @@ def pretty_print_syntax(syntax: Syntax) -> None:
             current_partial_segment = None
 
             current_char_index = 0
+
+            # A typo ~ 1 in 20 characters seems about right to me
+            typo = random.random() < 0.05
+
             i: Segment
             for index, i in enumerate(self.result):
                 if i.text.isspace():
@@ -84,14 +89,31 @@ def pretty_print_syntax(syntax: Syntax) -> None:
                     current_char_index += len(i.text)
 
                 elif current_char_index + len(i.text) == self.progress:
-                    yield from self.result[: index + 1]
+                    if typo:
+                        yield from self.result[: index + 1] + [
+                            Segment(
+                                random.choice(string.printable),
+                                self.result[index].style,
+                                False,
+                            )
+                        ]
+                    else:
+                        yield from self.result[: index + 1]
                     return
 
                 else:
                     partial_length = self.progress - current_char_index
-                    current_partial_segment = Segment(
-                        i.text[:partial_length], i.style, i.is_control
-                    )
+                    if typo:
+                        current_partial_segment = Segment(
+                            i.text[:partial_length] + random.choice(string.printable),
+                            i.style,
+                            i.is_control,
+                        )
+                    else:
+                        current_partial_segment = Segment(
+                            i.text[:partial_length], i.style, i.is_control
+                        )
+
                     yield from self.result[:index] + [current_partial_segment]
                     return
             return
